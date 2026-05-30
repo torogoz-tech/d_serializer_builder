@@ -1,0 +1,14 @@
+builders:
+  d_serializer_builder:
+    import: "package:d_serializer_builder/d_serializer_builder.dart"
+    builder_factories: ["buildSerializer"]
+    build_extensions: {".dart": [".g.dart"]}
+    auto_apply: dependents
+    build_to: source
+
+  d_serializer_registry_builder:
+    import: "package:d_serializer_builder/d_serializer_builder.dart"
+    builder_factories: ["buildSerializerRegistry"]
+    build_extensions: {"$lib$": ["d_serializer_registry.g.dart"]}
+    auto_apply: dependents
+    build_to: source
