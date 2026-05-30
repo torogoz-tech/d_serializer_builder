@@ -39,8 +39,7 @@ class SerializerRegistryBuilder implements Builder {
 
     final StringBuffer content = StringBuffer()
       ..writeln('// GENERATED CODE - DO NOT MODIFY BY HAND')
-      ..writeln()
-      ..writeln("import 'package:d_serializer/d_serializer.dart';");
+      ..writeln();
 
     for (int i = 0; i < classes.length; i++) {
       content.writeln("import '${_importPath(classes[i].filePath)}' as _m$i;");

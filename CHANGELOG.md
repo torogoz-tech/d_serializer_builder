@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-05-30
+
+### Changed
+- Builder release metadata aligned for `d_serializer 1.1.x` consumption.
+- Release process documentation improved with a pre-publish checklist.
+
 ## [1.1.0] - 2026-05-30
 
 ### Added
