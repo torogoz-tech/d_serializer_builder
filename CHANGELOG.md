@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-05-30
+
+### Added
+- Formatter generation support for `@Format(...)`:
+  - `trim`, `uppercase`, `lowercase`
+  - `date('yyyy-MM-dd')`, `date('iso8601')`
+  - `custom('X')` calling `XFormatToJson` / `XFormatFromJson`
+- Build-time validation for formatter compatibility:
+  - String formatters only on `String` / `String?`
+  - Date formatter only on `DateTime` / `DateTime?`
+  - Empty `@Format.custom('')` is rejected
+
+### Fixed
+- Registry generation in Flutter/build_runner synthetic input path (`lib/$lib$`).
+- `d_serializer_registry.g.dart` generation reliability for `initializeDSerializer()`.
+
+### Changed
+- README expanded with formatter behavior, validation rules, and custom formatter contract.
+
 ## [1.0.2] - 2026-05-29
 
 ### Fixed
