@@ -1,6 +1,6 @@
 name: d_serializer_builder
 description: "Code generator for d_serializer: generates model serializers (*.g.dart) and a global initializeDSerializer() registry for Dart and Flutter projects."
-version: 1.1.1
+version: 1.1.2
 repository: https://github.com/torogoz-tech/d_serializer_builder
 homepage: https://github.com/torogoz-tech/d_serializer_builder
 topics:
