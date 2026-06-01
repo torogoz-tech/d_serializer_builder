@@ -69,14 +69,16 @@ The builder supports formatter pipelines per field:
 - `@Format.date('yyyy-MM-dd')`
 - `@Format.date('iso8601')`
 - `@Format.custom('X')`
+- `@Format.customWith(TypeName)`
 
 Build-time validation includes:
 
 - String formatters require `String`/`String?` fields.
 - Date formatter requires `DateTime`/`DateTime?` fields.
 - Empty custom formatter names fail generation.
+- `@Format.customWith(TypeName)` requires a valid type literal.
 
-For `@Format.custom('X')`, the model library must provide:
+For `@Format.custom('X')` and `@Format.customWith(TypeName)`, the model library must provide:
 
 - `XFormatToJson(dynamic value)`
 - `XFormatFromJson(dynamic value)`

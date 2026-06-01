@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-06-01
+
+### Added
+- Typed formatter support in codegen for `@Format.customWith(TypeName)`.
+
+### Fixed
+- `@Format.date(...)` generation pipeline now preserves correct DateTime/String transformation order.
+- Generated serializer files now include lint suppression for naming required by generated APIs.
+- Reduced unnecessary cast generation in formatter pipelines.
+
+### Changed
+- Builder README updated with typed formatter contract.
+
 ## [1.1.2] - 2026-05-30
 
 ### Changed

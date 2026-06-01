@@ -124,6 +124,7 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
 
     return '''
 // GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: non_constant_identifier_names
 
 $className ${className}FromJson(Map<String, dynamic> json) {
   $guards$fromJsonBody
@@ -163,6 +164,7 @@ extension ${className}Serializer on $className {
     List<_FormatSpec> formats,
   ) {
     _validateFormatCompatibility(className, fieldName, typeStr, formats);
+    final bool hasDateFormat = _hasDateFormat(formats);
 
     if (converter != null && converter.isNotEmpty) {
       final bool nullable = type.nullabilitySuffix.name != 'none';
@@ -209,7 +211,15 @@ extension ${className}Serializer on $className {
       toExpr = '($fieldName as Map).map((k, v) => MapEntry(k.toString(), $toJsonInner))';
       fromExpr = "(json['$jsonKey'] as Map).map((k, v) => MapEntry(k.toString(), $fromJsonInner))";
     } else if (type.element?.name == 'DateTime') {
-      if (typeStr.endsWith('?')) {
+      if (hasDateFormat) {
+        if (typeStr.endsWith('?')) {
+          toExpr = fieldName;
+          fromExpr = "json['$jsonKey']";
+        } else {
+          toExpr = fieldName;
+          fromExpr = "json['$jsonKey']";
+        }
+      } else if (typeStr.endsWith('?')) {
         toExpr = "$fieldName == null ? null : ($fieldName as DateTime).toIso8601String()";
         fromExpr = "json['$jsonKey'] == null ? null : DateTime.parse(json['$jsonKey'] as String)";
       } else {
@@ -277,6 +287,15 @@ extension ${className}Serializer on $className {
     fromJsonParams.add('$fieldName: $fromExpr,');
   }
 
+  bool _hasDateFormat(List<_FormatSpec> formats) {
+    for (final _FormatSpec format in formats) {
+      if (format.kind == 'date') {
+        return true;
+      }
+    }
+    return false;
+  }
+
   String _enumToJsonExpr(String fieldName, String typeStr, bool useEnumIndex) {
     if (typeStr.endsWith('?')) {
       final String cleanType = _nonNullableType(typeStr);
@@ -333,10 +352,14 @@ extension ${className}Serializer on $className {
       if (kind == null || kind.isEmpty) {
         continue;
       }
-      final String? pattern = _readOptionalString(reader, 'pattern');
-      if (kind == 'custom' && (pattern == null || pattern.trim().isEmpty)) {
+      String? pattern = _readOptionalString(reader, 'pattern');
+      if (kind == 'customWith') {
+        pattern = _readOptionalTypeName(reader, 'formatterType');
+      }
+      if ((kind == 'custom' || kind == 'customWith') &&
+          (pattern == null || pattern.trim().isEmpty)) {
         throw InvalidGenerationSourceError(
-          'Invalid @Format.custom on ${field.enclosingElement.displayName}.${field.displayName}: custom formatter name cannot be empty.',
+          'Invalid @Format.$kind on ${field.enclosingElement.displayName}.${field.displayName}: formatter name cannot be empty.',
           element: field,
         );
       }
@@ -397,29 +420,30 @@ extension ${className}Serializer on $className {
         case 'trim':
           if (baseType != 'String') continue;
           formatted = nullable
-              ? '($formatted == null ? null : ($formatted as String).trim())'
-              : '(($formatted) as String).trim()';
+              ? '($formatted == null ? null : $formatted.trim())'
+              : '($formatted).trim()';
           break;
         case 'uppercase':
           if (baseType != 'String') continue;
           formatted = nullable
-              ? '($formatted == null ? null : ($formatted as String).toUpperCase())'
-              : '(($formatted) as String).toUpperCase()';
+              ? '($formatted == null ? null : $formatted.toUpperCase())'
+              : '($formatted).toUpperCase()';
           break;
         case 'lowercase':
           if (baseType != 'String') continue;
           formatted = nullable
-              ? '($formatted == null ? null : ($formatted as String).toLowerCase())'
-              : '(($formatted) as String).toLowerCase()';
+              ? '($formatted == null ? null : $formatted.toLowerCase())'
+              : '($formatted).toLowerCase()';
           break;
         case 'date':
           if (baseType != 'DateTime' || format.pattern == null) continue;
           final String patternLiteral = _literalToCode(format.pattern);
           formatted = nullable
-              ? '($formatted == null ? null : Serializer.formatDate(($formatted as DateTime), $patternLiteral))'
-              : 'Serializer.formatDate((($formatted) as DateTime), $patternLiteral)';
+              ? '($formatted == null ? null : Serializer.formatDate($formatted, $patternLiteral))'
+              : 'Serializer.formatDate(($formatted), $patternLiteral)';
           break;
         case 'custom':
+        case 'customWith':
           if (format.pattern == null || format.pattern!.isEmpty) continue;
           final String formatterName = format.pattern!;
           formatted = nullable
@@ -449,29 +473,30 @@ extension ${className}Serializer on $className {
         case 'trim':
           if (baseType != 'String') continue;
           formatted = nullable
-              ? '($formatted == null ? null : ($formatted as String).trim())'
-              : '(($formatted) as String).trim()';
+              ? '($formatted == null ? null : $formatted.trim())'
+              : '($formatted).trim()';
           break;
         case 'uppercase':
           if (baseType != 'String') continue;
           formatted = nullable
-              ? '($formatted == null ? null : ($formatted as String).toUpperCase())'
-              : '(($formatted) as String).toUpperCase()';
+              ? '($formatted == null ? null : $formatted.toUpperCase())'
+              : '($formatted).toUpperCase()';
           break;
         case 'lowercase':
           if (baseType != 'String') continue;
           formatted = nullable
-              ? '($formatted == null ? null : ($formatted as String).toLowerCase())'
-              : '(($formatted) as String).toLowerCase()';
+              ? '($formatted == null ? null : $formatted.toLowerCase())'
+              : '($formatted).toLowerCase()';
           break;
         case 'date':
           if (baseType != 'DateTime' || format.pattern == null) continue;
           final String patternLiteral = _literalToCode(format.pattern);
           formatted = nullable
-              ? '($formatted == null ? null : Serializer.parseDate(($formatted as String), $patternLiteral))'
-              : 'Serializer.parseDate((($formatted) as String), $patternLiteral)';
+              ? '($formatted == null ? null : Serializer.parseDate($formatted, $patternLiteral))'
+              : 'Serializer.parseDate(($formatted), $patternLiteral)';
           break;
         case 'custom':
+        case 'customWith':
           if (format.pattern == null || format.pattern!.isEmpty) continue;
           final String formatterName = format.pattern!;
           formatted = nullable
@@ -561,6 +586,14 @@ extension ${className}Serializer on $className {
       return null;
     }
     return value.stringValue;
+  }
+
+  String? _readOptionalTypeName(ConstantReader reader, String field) {
+    final ConstantReader? value = reader.peek(field);
+    if (value == null || value.isNull || !value.isType) {
+      return null;
+    }
+    return value.typeValue.getDisplayString(withNullability: false);
   }
 
   bool? _readOptionalBool(ConstantReader reader, String field) {
