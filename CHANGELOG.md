@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.4] - 2026-06-01
+
+### Fixed
+- Removed redundant casts in generated formatter pipelines to satisfy pub.dev static analysis (`unnecessary_cast`).
+
 ## [1.1.3] - 2026-06-01
 
 ### Added
