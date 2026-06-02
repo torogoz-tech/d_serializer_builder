@@ -103,3 +103,8 @@ And global file:
 ## License
 
 MIT
+
+
+## Union / sealed support
+
+When a `@Serializable()` subtype extends or implements a `@SerializableUnion(...)` root, generated registration now includes `Serializer.registerUnion<Root>(...)` automatically.

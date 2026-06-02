@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-06-01
+
+### Added
+- Union/sealed polymorphism code generation support.
+- Auto generation of `Serializer.registerUnion<Root>(...)` calls for subtypes.
+
+### Changed
+- Subtype payload generation now injects union discriminator field automatically.
+- Object field generation now targets runtime dynamic encode/decode to support polymorphic properties.
+
 ## [1.1.4] - 2026-06-01
 
 ### Fixed
