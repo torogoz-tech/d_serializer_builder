@@ -2,6 +2,37 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-06-03
+
+### Added
+
+- **UnknownKeyPolicy support** in code generation:
+  - Reads `unknownKeyPolicy` from `@Serializable` annotation
+  - Generates validation logic for `strict` mode
+  - Skips validation for `ignore` mode (default)
+  - Supports `capture` mode with `extra` field
+- **Backward compatibility** with deprecated `strict: true` parameter
+- **Comprehensive documentation** with:
+  - Complete annotation reference with generated code examples
+  - Build configuration guide (build.yaml, CLI options)
+  - Generated code examples for all scenarios
+  - Integration examples (Flutter, HTTP, Dio)
+  - Build-time validation documentation
+
+### Changed
+
+- Generator now reads both `unknownKeyPolicy` (new) and `strict` (deprecated)
+- Default behavior changed from strict to ignore
+- README expanded with detailed code generation examples
+
+### Documentation
+
+- New table of contents for easy navigation
+- Added UnknownKeyPolicy generation section
+- Added build configuration section
+- Added integration examples for Flutter, HTTP, and Dio
+- Added troubleshooting guide
+
 ## [1.2.0] - 2026-06-01
 
 ### Added
