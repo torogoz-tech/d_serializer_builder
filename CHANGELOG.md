@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-06-02
+
+### Added
+- **Polymorphic union generation**: Builder now detects `@SerializableUnion` annotations and generates `Serializer.registerUnion<T>(...)` calls for each subtype.
+  - Automatic discriminator field inclusion in generated JSON
+  - Union factory registration for runtime type resolution
+
 ## [1.1.4] - 2026-06-01
 
 ### Fixed
