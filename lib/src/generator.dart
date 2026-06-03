@@ -34,11 +34,6 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
     
     final JsonNaming naming = _readNaming(annotation);
     final String resolvedDiscriminator = discriminator ?? rename ?? className;
-    final List<_UnionRegistrationSpec> unions =
-        _collectUnionRegistrations(element, resolvedDiscriminator);
-    final String? effectiveTypeField = (typeField != null && typeField.isNotEmpty)
-        ? typeField
-        : (unions.isNotEmpty ? unions.first.typeField : null);
 
     final List<FieldElement> fields =
         element.fields.where((FieldElement f) => !f.isStatic && !f.isPrivate).toList();
@@ -48,12 +43,12 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
     final List<String> fromJsonGuards = <String>[];
     final List<String> knownKeys = <String>[];
 
-    if (effectiveTypeField != null && effectiveTypeField.isNotEmpty) {
-      knownKeys.add(effectiveTypeField);
+    if (typeField != null && typeField.isNotEmpty) {
+      knownKeys.add(typeField);
       fromJsonGuards.add(
-        "if (json['$effectiveTypeField'] != '$resolvedDiscriminator') { throw ArgumentError('Invalid discriminator for $className at $effectiveTypeField: expected $resolvedDiscriminator'); }",
+        "if (json['$typeField'] != '$resolvedDiscriminator') { throw ArgumentError('Invalid discriminator for $className at $typeField: expected $resolvedDiscriminator'); }",
       );
-      toJsonEntries.add("'$effectiveTypeField': '$resolvedDiscriminator',");
+      toJsonEntries.add("'$typeField': '$resolvedDiscriminator',");
     }
 
     for (final FieldElement field in fields) {
@@ -134,10 +129,6 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
     final String toJsonBody = 'return <String, dynamic>{\n${toJsonEntries.join('\n')}\n};';
     final String fromJsonBody = 'return $className(\n${fromJsonParams.join('\n')}\n);';
     final String guards = fromJsonGuards.isEmpty ? '' : '${fromJsonGuards.join('\n  ')}\n  ';
-    final String unionRegistrations = unions
-        .map((u) => "  Serializer.registerUnion<${u.baseType}>(typeField: '${u.typeField}', discriminator: '${u.discriminator}', fromJson: (Map<String, dynamic> json) => ${className}FromJson(json));")
-        .join('\n');
-    final String unionBlock = unionRegistrations.isEmpty ? '' : '$unionRegistrations\n';
 
     // Check for @SerializableUnion ancestor and generate union registration
     final String unionRegistration = _generateUnionRegistration(element, className, resolvedDiscriminator);
