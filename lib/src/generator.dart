@@ -6,6 +6,9 @@ import 'package:d_serializer/d_serializer.dart';
 import 'package:d_serializer_builder/src/utils.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Annotation name for SerializableUnion
+const _serializableUnionName = 'SerializableUnion';
+
 class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
   @override
   String generateForAnnotatedElement(
@@ -24,7 +27,11 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
     final String? rename = _readOptionalString(annotation, 'rename');
     final String? discriminator = _readOptionalString(annotation, 'discriminator');
     final String? typeField = _readOptionalString(annotation, 'typeField');
-    final bool strict = _readOptionalBool(annotation, 'strict') ?? false;
+    
+    // Read unknownKeyPolicy - support both old 'strict' bool and new enum
+    final bool strictBool = _readOptionalBool(annotation, 'strict') ?? false;
+    final UnknownKeyPolicy unknownKeyPolicy = _readUnknownKeyPolicy(annotation, strictBool);
+    
     final JsonNaming naming = _readNaming(annotation);
     final String resolvedDiscriminator = discriminator ?? rename ?? className;
 
@@ -111,7 +118,8 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
       );
     }
 
-    if (strict) {
+    // Handle unknown keys based on policy
+    if (unknownKeyPolicy == UnknownKeyPolicy.strict) {
       final String keys = knownKeys.map((String item) => "'$item'").join(', ');
       fromJsonGuards.add(
         "const Set<String> _allowedKeys = <String>{$keys}; for (final String key in json.keys) { if (!_allowedKeys.contains(key)) { throw ArgumentError('Unknown field for $className: \$key'); } }",
@@ -121,6 +129,9 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
     final String toJsonBody = 'return <String, dynamic>{\n${toJsonEntries.join('\n')}\n};';
     final String fromJsonBody = 'return $className(\n${fromJsonParams.join('\n')}\n);';
     final String guards = fromJsonGuards.isEmpty ? '' : '${fromJsonGuards.join('\n  ')}\n  ';
+
+    // Check for @SerializableUnion ancestor and generate union registration
+    final String unionRegistration = _generateUnionRegistration(element, className, resolvedDiscriminator);
 
     return '''
 // GENERATED CODE - DO NOT MODIFY BY HAND
@@ -133,13 +144,7 @@ $className ${className}FromJson(Map<String, dynamic> json) {
 Map<String, dynamic> ${className}ToJson($className value) {
   return value.toJson();
 }
-
-void register${className}Serializer() {
-  Serializer.register<$className>(
-    fromJson: ${className}FromJson,
-    toJson: ${className}ToJson,
-  );
-}
+$unionRegistration
 
 extension ${className}Serializer on $className {
   Map<String, dynamic> toJson() {
@@ -147,6 +152,40 @@ extension ${className}Serializer on $className {
   }
 }
 ''';
+  }
+
+String _generateUnionRegistration(
+    ClassElement element,
+    String className,
+    String discriminator,
+  ) {
+    // Look for @SerializableUnion annotation in class hierarchy
+    final ConstantReader? unionAnnotation = _findSerializableUnionAnnotation(element);
+    if (unionAnnotation == null) {
+      // Check if this class itself is annotated (for root types)
+      return '''
+void register${className}Serializer() {
+  Serializer.register<$className>(
+    fromJson: ${className}FromJson,
+    toJson: ${className}ToJson,
+  );
+}''';
+    }
+
+    final String typeField = _readOptionalString(unionAnnotation, 'typeField') ?? 'type';
+
+    return '''
+void register${className}Serializer() {
+  Serializer.register<$className>(
+    fromJson: ${className}FromJson,
+    toJson: ${className}ToJson,
+  );
+  Serializer.registerUnion<$className>(
+    typeField: '$typeField',
+    discriminator: '$discriminator',
+    fromJson: ${className}FromJson,
+  );
+}''';
   }
 
   void _addFieldSerialization(
@@ -272,8 +311,8 @@ extension ${className}Serializer on $className {
       toExpr = fieldName;
       fromExpr = "json['$jsonKey']";
     } else {
-      toExpr = '$fieldName.toJson()';
-      fromExpr = "${typeStr}FromJson(json['$jsonKey'] as Map<String, dynamic>)";
+      toExpr = 'Serializer.encodeDynamic($fieldName)';
+      fromExpr = "Serializer.fromDynamic<$typeStr>(json['$jsonKey'])";
     }
 
     if (defaultValueCode != null) {
@@ -335,6 +374,15 @@ extension ${className}Serializer on $className {
   ConstantReader? _getJsonKeyAnnotation(FieldElement field) {
     for (final ElementAnnotation annotation in field.metadata.annotations) {
       if (annotation.element?.displayName == 'JsonKey') {
+        return ConstantReader(annotation.computeConstantValue());
+      }
+    }
+    return null;
+  }
+
+  ConstantReader? _getSerializableUnionAnnotation(ClassElement element) {
+    for (final ElementAnnotation annotation in element.metadata.annotations) {
+      if (annotation.element?.displayName == 'SerializableUnion') {
         return ConstantReader(annotation.computeConstantValue());
       }
     }
@@ -604,6 +652,26 @@ extension ${className}Serializer on $className {
     return value.boolValue;
   }
 
+  UnknownKeyPolicy _readUnknownKeyPolicy(ConstantReader annotation, bool strictBool) {
+    // Check for new unknownKeyPolicy enum first
+    final ConstantReader? value = annotation.peek('unknownKeyPolicy');
+    if (value != null && !value.isNull) {
+      final String name = value.revive().accessor;
+      if (name == 'UnknownKeyPolicy.strict') {
+        return UnknownKeyPolicy.strict;
+      } else if (name == 'UnknownKeyPolicy.ignore') {
+        return UnknownKeyPolicy.ignore;
+      } else if (name == 'UnknownKeyPolicy.capture') {
+        return UnknownKeyPolicy.capture;
+      }
+    }
+    // Fallback to old 'strict' boolean
+    if (strictBool) {
+      return UnknownKeyPolicy.strict;
+    }
+    return UnknownKeyPolicy.ignore; // Default
+  }
+
   JsonNaming _readNaming(ConstantReader annotation) {
     final ConstantReader? value = annotation.peek('naming');
     if (value == null || value.isNull) {
@@ -665,4 +733,61 @@ class _FormatSpec {
 
   final String kind;
   final String? pattern;
+}
+
+/// Information about a union type collected during generation.
+class _UnionInfo {
+  const _UnionInfo({
+    required this.rootType,
+    required this.typeField,
+    required this.discriminator,
+    required this.fromJsonFunc,
+  });
+
+  final String rootType;
+  final String typeField;
+  final String discriminator;
+  final String fromJsonFunc;
+}
+
+/// Find @SerializableUnion in the class hierarchy and return the annotation.
+ConstantReader? _findSerializableUnionAnnotation(ClassElement element) {
+  for (final ElementAnnotation annotation in element.metadata.annotations) {
+    final constant = annotation.computeConstantValue();
+    if (constant != null) {
+      final typeName = constant.type?.getDisplayString(withNullability: false);
+      if (typeName == _serializableUnionName) {
+        return ConstantReader(constant);
+      }
+    }
+  }
+
+  // Check superclasses
+  final supertype = element.supertype;
+  if (supertype != null && supertype.element is ClassElement) {
+    final result = _findSerializableUnionAnnotation(supertype.element as ClassElement);
+    if (result != null) return result;
+  }
+
+  return null;
+}
+
+/// Find the root type name for a class with @SerializableUnion.
+String? _findUnionRootType(ClassElement element) {
+  for (final ElementAnnotation annotation in element.metadata.annotations) {
+    final constant = annotation.computeConstantValue();
+    if (constant != null) {
+      final typeName = constant.type?.getDisplayString(withNullability: false);
+      if (typeName == _serializableUnionName) {
+        return element.displayName;
+      }
+    }
+  }
+
+  final supertype = element.supertype;
+  if (supertype != null && supertype.element is ClassElement) {
+    return _findUnionRootType(supertype.element as ClassElement);
+  }
+
+  return null;
 }
