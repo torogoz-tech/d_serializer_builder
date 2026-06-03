@@ -6,6 +6,9 @@ import 'package:d_serializer/d_serializer.dart';
 import 'package:d_serializer_builder/src/utils.dart';
 import 'package:source_gen/source_gen.dart';
 
+/// Annotation name for SerializableUnion
+const _serializableUnionName = 'SerializableUnion';
+
 class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
   @override
   String generateForAnnotatedElement(
@@ -136,6 +139,9 @@ class SerializableGenerator extends GeneratorForAnnotation<Serializable> {
         .join('\n');
     final String unionBlock = unionRegistrations.isEmpty ? '' : '$unionRegistrations\n';
 
+    // Check for @SerializableUnion ancestor and generate union registration
+    final String unionRegistration = _generateUnionRegistration(element, className, resolvedDiscriminator);
+
     return '''
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: non_constant_identifier_names
@@ -147,13 +153,7 @@ $className ${className}FromJson(Map<String, dynamic> json) {
 Map<String, dynamic> ${className}ToJson($className value) {
   return value.toJson();
 }
-
-void register${className}Serializer() {
-  Serializer.register<$className>(
-    fromJson: ${className}FromJson,
-    toJson: ${className}ToJson,
-  );
-${unionBlock}}
+$unionRegistration
 
 extension ${className}Serializer on $className {
   Map<String, dynamic> toJson() {
@@ -163,33 +163,38 @@ extension ${className}Serializer on $className {
 ''';
   }
 
-  List<_UnionRegistrationSpec> _collectUnionRegistrations(
+String _generateUnionRegistration(
     ClassElement element,
-    String resolvedDiscriminator,
+    String className,
+    String discriminator,
   ) {
-    final Map<String, _UnionRegistrationSpec> unionsByType =
-        <String, _UnionRegistrationSpec>{};
-    for (final InterfaceType supertype in element.allSupertypes) {
-      final Element superElement = supertype.element;
-      if (superElement is! ClassElement) {
-        continue;
-      }
-
-      final ConstantReader? unionAnnotation =
-          _getSerializableUnionAnnotation(superElement);
-      if (unionAnnotation == null) {
-        continue;
-      }
-
-      final String typeField =
-          _readOptionalString(unionAnnotation, 'typeField') ?? 'type';
-      unionsByType[superElement.displayName] = _UnionRegistrationSpec(
-        baseType: superElement.displayName,
-        typeField: typeField,
-        discriminator: resolvedDiscriminator,
-      );
+    // Look for @SerializableUnion annotation in class hierarchy
+    final ConstantReader? unionAnnotation = _findSerializableUnionAnnotation(element);
+    if (unionAnnotation == null) {
+      // Check if this class itself is annotated (for root types)
+      return '''
+void register${className}Serializer() {
+  Serializer.register<$className>(
+    fromJson: ${className}FromJson,
+    toJson: ${className}ToJson,
+  );
+}''';
     }
-    return unionsByType.values.toList();
+
+    final String typeField = _readOptionalString(unionAnnotation, 'typeField') ?? 'type';
+
+    return '''
+void register${className}Serializer() {
+  Serializer.register<$className>(
+    fromJson: ${className}FromJson,
+    toJson: ${className}ToJson,
+  );
+  Serializer.registerUnion<$className>(
+    typeField: '$typeField',
+    discriminator: '$discriminator',
+    fromJson: ${className}FromJson,
+  );
+}''';
   }
 
   void _addFieldSerialization(
@@ -739,14 +744,59 @@ class _FormatSpec {
   final String? pattern;
 }
 
-class _UnionRegistrationSpec {
-  const _UnionRegistrationSpec({
-    required this.baseType,
+/// Information about a union type collected during generation.
+class _UnionInfo {
+  const _UnionInfo({
+    required this.rootType,
     required this.typeField,
     required this.discriminator,
+    required this.fromJsonFunc,
   });
 
-  final String baseType;
+  final String rootType;
   final String typeField;
   final String discriminator;
+  final String fromJsonFunc;
+}
+
+/// Find @SerializableUnion in the class hierarchy and return the annotation.
+ConstantReader? _findSerializableUnionAnnotation(ClassElement element) {
+  for (final ElementAnnotation annotation in element.metadata.annotations) {
+    final constant = annotation.computeConstantValue();
+    if (constant != null) {
+      final typeName = constant.type?.getDisplayString(withNullability: false);
+      if (typeName == _serializableUnionName) {
+        return ConstantReader(constant);
+      }
+    }
+  }
+
+  // Check superclasses
+  final supertype = element.supertype;
+  if (supertype != null && supertype.element is ClassElement) {
+    final result = _findSerializableUnionAnnotation(supertype.element as ClassElement);
+    if (result != null) return result;
+  }
+
+  return null;
+}
+
+/// Find the root type name for a class with @SerializableUnion.
+String? _findUnionRootType(ClassElement element) {
+  for (final ElementAnnotation annotation in element.metadata.annotations) {
+    final constant = annotation.computeConstantValue();
+    if (constant != null) {
+      final typeName = constant.type?.getDisplayString(withNullability: false);
+      if (typeName == _serializableUnionName) {
+        return element.displayName;
+      }
+    }
+  }
+
+  final supertype = element.supertype;
+  if (supertype != null && supertype.element is ClassElement) {
+    return _findUnionRootType(supertype.element as ClassElement);
+  }
+
+  return null;
 }

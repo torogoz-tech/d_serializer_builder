@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.3.0] - 2026-06-03
+## [1.2.0] - 2026-06-03
 
 ### Added
 
@@ -11,6 +11,9 @@ All notable changes to this project will be documented in this file.
   - Generates validation logic for `strict` mode
   - Skips validation for `ignore` mode (default)
   - Supports `capture` mode with `extra` field
+- **Polymorphic union generation**: Builder now detects `@SerializableUnion` annotations and generates `Serializer.registerUnion<T>(...)` calls for each subtype.
+  - Automatic discriminator field inclusion in generated JSON
+  - Union factory registration for runtime type resolution
 - **Backward compatibility** with deprecated `strict: true` parameter
 - **Comprehensive documentation** with:
   - Complete annotation reference with generated code examples
@@ -24,24 +27,8 @@ All notable changes to this project will be documented in this file.
 - Generator now reads both `unknownKeyPolicy` (new) and `strict` (deprecated)
 - Default behavior changed from strict to ignore
 - README expanded with detailed code generation examples
-
-### Documentation
-
-- New table of contents for easy navigation
-- Added UnknownKeyPolicy generation section
-- Added build configuration section
-- Added integration examples for Flutter, HTTP, and Dio
-- Added troubleshooting guide
-
-## [1.2.0] - 2026-06-01
-
-### Added
-- Union/sealed polymorphism code generation support.
-- Auto generation of `Serializer.registerUnion<Root>(...)` calls for subtypes.
-
-### Changed
-- Subtype payload generation now injects union discriminator field automatically.
-- Object field generation now targets runtime dynamic encode/decode to support polymorphic properties.
+- Subtype payload generation now injects union discriminator field automatically
+- Object field generation now targets runtime dynamic encode/decode to support polymorphic properties
 
 ## [1.1.4] - 2026-06-01
 
